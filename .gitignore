@@ -5,6 +5,7 @@
 .*.swp
 .*.swo
 .*.un~
+*.iml
 *.o
 *.d
 *.so
@@ -12,6 +13,7 @@
 *.clb
 config.json
 clcache
+.idea/
 
 board/obj/
 selfdrive/boardd/boardd
