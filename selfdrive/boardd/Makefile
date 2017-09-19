@@ -2,6 +2,7 @@ CC = clang
 CXX = clang++
 
 ARCH := $(shell uname -m)
+OS := $(shell uname -o)
 
 PHONELIBS = ../../phonelibs
 
@@ -19,28 +20,36 @@ ZMQ_LIBS = -L$(PHONELIBS)/zmq/aarch64/lib \
            -l:libczmq.a -l:libzmq.a \
            -lgnustl_shared
 
-CEREAL_FLAGS = -I$(PHONELIBS)/capnp-cpp/include
-CEREAL_LIBS = -L$(PHONELIBS)/capnp-cpp/aarch64/lib/ \
-              -l:libcapnp.a -l:libkj.a
-CEREAL_OBJS = ../../cereal/gen/c/log.capnp.o
+JSON_FLAGS = -I$(PHONELIBS)/json/src
 
 EXTRA_LIBS = -lusb
 
-ifeq ($(ARCH),x86_64)
-ZMQ_LIBS = -L$(HOME)/drive/external/zmq/lib/ \
-           -l:libczmq.a -l:libzmq.a
-CEREAL_LIBS = -L$(HOME)/drive/external/capnp/lib/ \
-              -l:libcapnp.a -l:libkj.a
+ifeq ($(OS),GNU/Linux)
+# for Drive PX2
+ZMQ_LIBS = -lczmq -lzmq
+CEREAL_LIBS = -lcapnp -lkj -lcapnp_c
 EXTRA_LIBS = -lusb-1.0 -lpthread
 endif
 
+ifeq ($(ARCH),x86_64)
+ZMQ_LIBS = -L$(HOME)/one/external/zmq/lib/ \
+           -l:libczmq.a -l:libzmq.a
+CEREAL_LIBS = -L$(HOME)/one/external/capnp/lib/ \
+              -l:libcapnp.a -l:libcapnp_c.a -l:libkj.a
+EXTRA_LIBS = -lusb-1.0 -lpthread
+endif
+
+.PHONY: all
+all: boardd
+
+include ../common/cereal.mk
 
 OBJS = boardd.o \
-       log.capnp.o
+       ../common/swaglog.o \
+       $(PHONELIBS)/json/src/json.o \
+       $(CEREAL_OBJS)
 
 DEPS := $(OBJS:.o=.d)
-
-all: boardd
 
 boardd: $(OBJS)
 	@echo "[ LINK ] $@"
@@ -53,18 +62,21 @@ boardd.o: boardd.cc
 	@echo "[ CXX ] $@"
 	$(CXX) $(CXXFLAGS) \
            -I$(PHONELIBS)/android_system_core/include \
-           $(CEREAL_FLAGS) \
+           $(CEREAL_CFLAGS) \
+           $(CEREAL_CXXFLAGS) \
            $(ZMQ_FLAGS) \
            -I../ \
            -I../../ \
            -c -o '$@' '$<'
 
-
-log.capnp.o: ../../cereal/gen/cpp/log.capnp.c++
-	@echo "[ CXX ] $@"
-	$(CXX) $(CXXFLAGS) $(CEREAL_FLAGS) \
-           -c -o '$@' '$<'
-  
+%.o: %.c
+	@echo "[ CC ] $@"
+	$(CC) $(CFLAGS) -MMD \
+          -Iinclude -I.. -I../.. \
+          $(CEREAL_CFLAGS) \
+          $(ZMQ_FLAGS) \
+          $(JSON_FLAGS) \
+          -c -o '$@' '$<'
 
 .PHONY: clean
 clean:

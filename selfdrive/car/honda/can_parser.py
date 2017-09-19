@@ -1,5 +1,5 @@
 import os
-import dbcs
+import opendbc
 from collections import defaultdict
 
 from selfdrive.car.honda.hondacan import fix
@@ -19,13 +19,12 @@ class CANParser(object):
     #               monitored.
     #             - frequency is the frequency at which health should be monitored.
 
-    self.msgs_ck = [check[0] for check in checks]
-    self.frqs = [check[1] for check in checks]
+    self.msgs_ck = set([check[0] for check in checks])
+    self.frqs = dict(checks)
     self.can_valid = False  # start with False CAN assumption
-    self.msgs_upd = []      # list of updated messages
     # list of received msg we want to monitor counter and checksum for
     # read dbc file
-    self.can_dbc = dbc(os.path.join(dbcs.DBC_PATH, dbc_f))
+    self.can_dbc = dbc(os.path.join(opendbc.DBC_PATH, dbc_f))
     # initialize variables to initial values
     self.vl = {}    # signal values
     self.ts = {}    # time stamp recorded in log
@@ -55,14 +54,16 @@ class CANParser(object):
       self._message_indices[x].append(i)
 
   def update_can(self, can_recv):
-    self.msgs_upd = []
+    msgs_upd = []
     cn_vl_max = 5   # no more than 5 wrong counter checks
+
+    self.sec_since_boot_cached = sec_since_boot()
 
     # we are subscribing to PID_XXX, else data from USB
     for msg, ts, cdat, _ in can_recv:
       idxs = self._message_indices[msg]
       if idxs:
-        self.msgs_upd.append(msg)
+        msgs_upd.append(msg)
         # read the entire message
         out = self.can_dbc.decode((msg, 0, cdat))[1]
         # checksum check
@@ -94,7 +95,7 @@ class CANParser(object):
 
         # update msg time stamps and counter value
         self.ts[msg] = ts
-        self.ct[msg] = sec_since_boot()
+        self.ct[msg] = self.sec_since_boot_cached
         self.cn[msg] = cn
         self.cn_vl[msg] = min(max(self.cn_vl[msg], 0), cn_vl_max)
 
@@ -107,7 +108,7 @@ class CANParser(object):
           sg = self._sgs[ii]
           self.vl[msg][sg] = out[sg]
 
-  # for each message, check if it's too long since last time we received it
+    # for each message, check if it's too long since last time we received it
     self._check_dead_msgs()
 
     # assess overall can validity: if there is one relevant message invalid, then set can validity flag to False
@@ -116,9 +117,11 @@ class CANParser(object):
       #print "CAN INVALID!"
       self.can_valid = False
 
+    return msgs_upd
+
   def _check_dead_msgs(self):
     ### input:
     ## simple stuff for now: msg is not valid if a message isn't received for 10 consecutive steps
     for msg in set(self._msgs):
-      if msg in self.msgs_ck and sec_since_boot() - self.ct[msg] > 10./self.frqs[self.msgs_ck.index(msg)]:
+      if msg in self.msgs_ck and self.sec_since_boot_cached - self.ct[msg] > 10./self.frqs[msg]:
         self.ok[msg] = False

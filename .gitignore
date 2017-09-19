@@ -1,16 +1,23 @@
 .DS_Store
 .tags
+.ipynb_checkpoints
+.idea
+model2.png
 
+*.d
 *.pyc
+*.pyo
 .*.swp
 .*.swo
 .*.un~
 *.iml
 *.o
-*.d
 *.so
 *.a
 *.clb
+*.class
+*.pyxbldc
+*.vcd
 config.json
 clcache
 .idea/
@@ -18,6 +25,7 @@ clcache
 board/obj/
 selfdrive/boardd/boardd
 selfdrive/logcatd/logcatd
-selfdrive/sensord/sensord
+selfdrive/proclogd/proclogd
 selfdrive/ui/ui
+/src/
 

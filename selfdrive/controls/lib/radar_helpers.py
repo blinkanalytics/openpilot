@@ -205,7 +205,7 @@ class Cluster(object):
     lead.vLeadK = float(self.vLeadK)
     lead.aLeadK = float(self.aLeadK)
     lead.status = True
-    lead.fcw = False
+    lead.fcw = self.is_potential_fcw()
 
   def __str__(self):
     ret = "x: %7.2f  y: %7.2f  v: %7.2f  a: %7.2f" % (self.dRel, self.yRel, self.vRel, self.aRel)
@@ -219,7 +219,7 @@ class Cluster(object):
       ret += " vision_cnt: %6.0f" % self.vision_cnt
     return ret
 
-  def is_potential_lead(self, v_ego, enabled):
+  def is_potential_lead(self, v_ego):
     # predict cut-ins by extrapolating lateral speed by a lookahead time
     # lookahead time depends on cut-in distance. more attentive for close cut-ins
     # also, above 50 meters the predicted path isn't very reliable
@@ -233,26 +233,25 @@ class Cluster(object):
     # average dist
     d_path = self.dPath
 
-    if enabled:
-      t_lookahead = interp(self.dRel, t_lookahead_bp, t_lookahead_v)
-      # correct d_path for lookahead time, considering only cut-ins and no more than 1m impact
-      lat_corr = clip(t_lookahead * self.vLat, -1, 0)
-    else:
-      lat_corr = 0.
+    # lat_corr used to be gated on enabled, now always running
+    t_lookahead = interp(self.dRel, t_lookahead_bp, t_lookahead_v)
+    # correct d_path for lookahead time, considering only cut-ins and no more than 1m impact
+    lat_corr = clip(t_lookahead * self.vLat, -1, 0)
+
     d_path = max(d_path + lat_corr, 0)
 
-    if d_path < 1.5 and not self.stationary and not self.oncoming:
-      return True
-    else:
-      return False
+    return d_path < 1.5 and not self.stationary and not self.oncoming
 
   def is_potential_lead2(self, lead_clusters):
     if len(lead_clusters) > 0:
       lead_cluster = lead_clusters[0]
-      # check if the new lead is too close and roughly at the same speed of the first lead: it might just be the second axle of the same vehicle
-      if (self.dRel - lead_cluster.dRel) < 8. and abs(self.vRel - lead_cluster.vRel) < 1.:
-        return False
-      else:
-        return True
+      # check if the new lead is too close and roughly at the same speed of the first lead:
+      # it might just be the second axle of the same vehicle
+      return (self.dRel - lead_cluster.dRel) > 8. or abs(self.vRel - lead_cluster.vRel) > 1.
     else:
       return False
+
+  def is_potential_fcw(self):
+    # is this cluster trustrable enough for triggering fcw?
+    # fcw can trigger only on clusters that have been fused vision model for at least 20 frames
+    return self.vision_cnt >= 20

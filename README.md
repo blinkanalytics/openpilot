@@ -7,53 +7,52 @@ Currently it performs the functions of Adaptive Cruise Control (ACC) and Lane Ke
 
 The openpilot codebase has been written to be concise and enable rapid prototyping. We look forward to your contributions - improving real vehicle automation has never been easier.
 
+Here are [some](https://www.youtube.com/watch?v=9OwTJFuDI7g) [videos](https://www.youtube.com/watch?v=64Wvt5pYQmE) [of](https://www.youtube.com/watch?v=6IW7Nejsr3A) [it](https://www.youtube.com/watch?v=-VN1YcC83nA) [running](https://www.youtube.com/watch?v=EQJZvVeihZk). And a really cool [tutorial](https://www.youtube.com/watch?v=PwOnsT2UW5o).
+
 Hardware
 ------
 
-Right now openpilot supports the [neo research platform](http://github.com/commaai/neo) for vehicle control. We'd like to support [Open Source Car Control](https://github.com/PolySync/OSCC) as well.
+Right now openpilot supports the [neo research platform](http://github.com/commaai/neo) for vehicle control. We'd like to support other platforms as well.
 
-To install it on the NEO:
-
-```bash
-# Requires working adb in PATH
-cd installation
-./install.sh
-```
+Install openpilot on a neo device by entering ``https://openpilot.comma.ai`` during NEOS setup.
 
 Supported Cars
 ------
 
 - Acura ILX 2016 with AcuraWatch Plus
-  - Limitations: Due to use of the cruise control for gas, it can only be enabled above 25 mph
+  - Due to use of the cruise control for gas, it can only be enabled above 25 mph
 
-- Honda Civic 2016 Touring Edition
-  - Limitations: Due to limitations in steering firmware, steering is disabled below 18 mph
+- Honda Civic 2016 with Honda Sensing
+  - Due to limitations in steering firmware, steering is disabled below 12 mph
+
+- Honda CR-V Touring 2015-2016 (very alpha!)
+  - Can only be enabled above 25 mph
 
 Directory structure
 ------
 
-- board         -- Code that runs on the USB interface board
 - cereal        -- The messaging spec used for all logs on the phone
 - common        -- Library like functionality we've developed here
-- dbcs          -- Files showing how to interpret data from cars
-- installation  -- Installation on the neo platform
+- opendbc       -- Files showing how to interpret data from cars
+- panda         -- Code used to communicate on CAN and LIN
 - phonelibs     -- Libraries used on the phone
 - selfdrive     -- Code needed to drive the car
   - assets        -- Fonts for ui
   - boardd        -- Daemon to talk to the board
-  - calibrationd  -- Camera calibration server
   - car           -- Code that talks to the car and implements CarInterface
   - common        -- Shared C/C++ code for the daemons
   - controls      -- Python controls (PID loops etc) for the car
+  - debug         -- Tools to help you debug and do car ports
   - logcatd       -- Android logcat as a service
   - loggerd       -- Logger and uploader of car data
+  - proclogd      -- Logs information from proc
   - radar         -- Code that talks to the radar and implements RadarInterface
   - sensord       -- IMU / GPS interface code
   - test/plant    -- Car simulator running code through virtual maneuvers
   - ui            -- The UI
   - visiond       -- embedded vision pipeline
 
-To understand how the services interact, see `common/services.py`
+To understand how the services interact, see `selfdrive/service_list.yaml`
 
 Testing on PC
 ------
@@ -72,11 +71,9 @@ More extensive testing infrastructure and simulation environments are coming soo
 Adding Car Support
 ------
 
-It should be relatively easy to add support for the Honda CR-V Touring. The brake message is the same. Steering has a slightly different message with a different message id. Sniff CAN while using LKAS to find it.
+comma.ai offers [bounties](http://comma.ai/bounties.html) for adding additional car support.
 
-The Honda Accord uses different signaling for the steering and probably requires new hardware.
-
-Adding other manufacturers besides Honda/Acura is doable but will be more of an undertaking.
+CR-V Touring support came in through this program. Chevy Volt is close. Accord is close as well.
 
 User Data / chffr Account / Crash Reporting
 ------
@@ -97,12 +94,14 @@ We welcome both pull requests and issues on
 [github](http://github.com/commaai/openpilot). See the TODO file for a list of
 good places to start.
 
-Want to get paid to work on openpilot? [comma.ai is hiring](http://comma.ai/hiring.html)
+Want to get paid to work on openpilot? [comma.ai is hiring](http://comma.ai/positions.html)
 
 Licensing
 ------
 
 openpilot is released under the MIT license.
+
+Any user of this software shall indemnify and hold harmless Comma.ai, Inc. and its directors, officers, employees, agents, stockholders, affiliates, subcontractors and customers from and against all allegations, claims, actions, suits, demands, damages, liabilities, obligations, losses, settlements, judgments, costs and expenses (including without limitation attorneys’ fees and costs) which arise out of, relate to or result from any use of this software by user.
 
 **THIS IS ALPHA QUALITY SOFTWARE FOR RESEARCH PURPOSES ONLY. THIS IS NOT A PRODUCT.
 YOU ARE RESPONSIBLE FOR COMPLYING WITH LOCAL LAWS AND REGULATIONS.

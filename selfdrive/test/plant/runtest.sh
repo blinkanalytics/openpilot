@@ -1,4 +1,8 @@
 #!/bin/bash
+
+export OPTEST=1
+export OLD_CAN=1
+
 pushd ../../controls
 ./controlsd.py &
 pid1=$!

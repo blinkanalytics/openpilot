@@ -2,10 +2,11 @@
 import os
 import struct
 import zmq
+import time
 
 import selfdrive.messaging as messaging
 from common.realtime import Ratekeeper
-from common.services import service_list
+from selfdrive.services import service_list
 from selfdrive.swaglog import cloudlog
 
 # USB is optional
@@ -16,6 +17,10 @@ except Exception:
   pass
 
 # TODO: rewrite in C to save CPU
+
+SAFETY_NOOUTPUT = 0
+SAFETY_HONDA = 1
+SAFETY_ALLOUTPUT = 0x1337
 
 # *** serialization functions ***
 def can_list_to_can_capnp(can_msgs, msgtype='can'):
@@ -56,7 +61,7 @@ def __parse_can_buffer(dat):
   for j in range(0, len(dat), 0x10):
     ddat = dat[j:j+0x10]
     f1, f2 = struct.unpack("II", ddat[0:8])
-    ret.append((f1 >> 21, f2>>16, ddat[8:8+(f2&0xF)], (f2>>4)&3))
+    ret.append((f1 >> 21, f2>>16, ddat[8:8+(f2&0xF)], (f2>>4)&0xF))
   return ret
 
 def can_send_many(arr):
@@ -84,6 +89,7 @@ def can_recv():
 
 def can_init():
   global handle, context
+  handle = None
   cloudlog.info("attempting can init")
 
   context = usb1.USBContext()
@@ -93,6 +99,7 @@ def can_init():
     if device.getVendorID() == 0xbbaa and device.getProductID() == 0xddcc:
       handle = device.open()
       handle.claimInterface(0)
+      handle.controlWrite(0x40, 0xdc, SAFETY_HONDA, 0, b'')
 
   if handle is None:
     print "CAN NOT FOUND"
@@ -121,6 +128,19 @@ def boardd_mock_loop():
     print "sent %d got %d" % (len(snd), len(can_msgs))
 
     #print can_msgs
+
+def boardd_test_loop():
+  can_init()
+  cnt = 0
+  while 1:
+    can_send_many([[0xbb,0,"\xaa\xaa\xaa\xaa",0], [0xaa,0,"\xaa\xaa\xaa\xaa"+struct.pack("!I", cnt),1]])
+    #can_send_many([[0xaa,0,"\xaa\xaa\xaa\xaa",0]])
+    #can_send_many([[0xaa,0,"\xaa\xaa\xaa\xaa",1]])
+    # recv @ 100hz
+    can_msgs = can_recv()
+    print "got %d" % (len(can_msgs))
+    time.sleep(0.01)
+    cnt += 1
 
 # *** main loop ***
 def boardd_loop(rate=200):
@@ -169,9 +189,10 @@ def boardd_loop(rate=200):
 def main(gctx=None):
   if os.getenv("MOCK") is not None:
     boardd_mock_loop()
+  elif os.getenv("BOARDTEST") is not None:
+    boardd_test_loop()
   else:
     boardd_loop()
 
 if __name__ == "__main__":
   main()
-

@@ -1,6 +1,7 @@
 import re
+import os
+import struct
 import bitstring
-from binascii import hexlify
 from collections import namedtuple
 
 def int_or_float(s):
@@ -16,7 +17,9 @@ DBCSignal = namedtuple(
 
 class dbc(object):
   def __init__(self, fn):
-    self.txt = open(fn).read().split("\n")
+    self.name, _ = os.path.splitext(os.path.basename(fn))
+    with open(fn) as f:
+      self.txt = f.read().split("\n")
     self._warned_addresses = set()
 
     # regexps from https://github.com/ebroecker/canmatrix/blob/master/canmatrix/importdbc.py
@@ -31,10 +34,8 @@ class dbc(object):
     # signals is a list of DBCSignal in order of increasing start_bit.
     self.msgs = {}
 
-    self.bits = []
-    for i in range(0, 64, 8):
-      for j in range(7, -1, -1):
-        self.bits.append(i+j)
+    # lookup to bit reverse each byte
+    self.bits_index = [(i & ~0b111) + ((-i-1) & 0b111) for i in xrange(64)]
 
     for l in self.txt:
       l = l.strip()
@@ -101,7 +102,7 @@ class dbc(object):
         if s.is_little_endian:
           ss = s.start_bit
         else:
-          ss = self.bits.index(s.start_bit)
+          ss = self.bits_index[s.start_bit]
 
 
         if s.is_signed:
@@ -133,6 +134,7 @@ class dbc(object):
 
         Returns (None, None) if the message could not be decoded.
     """
+    
     if arr is None:
       out = {}
     else:
@@ -150,7 +152,9 @@ class dbc(object):
       print name
 
     blen = 8*len(x[2])
-    x2_int = int(hexlify(x[2]), 16)
+
+    st = x[2].rjust(8, '\x00')
+    le, be = None, None
 
     for s in msg[1]:
       if arr is not None and s[0] not in arr:
@@ -159,11 +163,18 @@ class dbc(object):
       # big or little endian?
       #   see http://vi-firmware.openxcplatform.com/en/master/config/bit-numbering.html
       if s[3] is False:
-        ss = self.bits.index(s[1])
+        ss = self.bits_index[s[1]]
+        if be is None:
+          be = struct.unpack(">Q", st)[0]
+        x2_int = be
+        data_bit_pos = (blen - (ss + s[2]))
       else:
+        if le is None:
+          le = struct.unpack("<Q", st)[0]
+        x2_int = le
         ss = s[1]
+        data_bit_pos = ss
 
-      data_bit_pos = (blen - (ss + s[2]))
       if data_bit_pos < 0:
         continue
       ival = (x2_int >> data_bit_pos) & ((1 << (s[2])) - 1)
@@ -172,12 +183,13 @@ class dbc(object):
         ival -= (1<<s[2])
 
       # control the offset
-      ival = (ival + s[6])*s[5]
-      if debug:
-        print "%40s  %2d %2d  %7.2f %s" % (s[0], s[1], s[2], ival, s[-1])
+      ival = (ival * s[5]) + s[6]
+      #if debug:
+      #  print "%40s  %2d %2d  %7.2f %s" % (s[0], s[1], s[2], ival, s[-1])
 
       if arr is None:
         out[s[0]] = ival
       else:
         out[arr.index(s[0])] = ival
     return name, out
+    
